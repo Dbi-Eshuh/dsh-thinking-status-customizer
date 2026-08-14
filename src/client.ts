@@ -368,14 +368,14 @@ function createControls(doc: Document): Controls {
   const colorA = doc.createElement('input')
   colorA.type = 'color'
   colorA.name = 'colorA'
-  colorA.setAttribute('aria-label', '主颜色')
-  const colorALabel = labelFor(doc, colorA, '主颜色')
+  colorA.setAttribute('aria-label', '流光颜色 A')
+  const colorALabel = labelFor(doc, colorA, '流光颜色 A')
 
   const colorB = doc.createElement('input')
   colorB.type = 'color'
   colorB.name = 'colorB'
-  colorB.setAttribute('aria-label', '光晕和指示点颜色')
-  const colorBLabel = labelFor(doc, colorB, '光晕和指示点颜色')
+  colorB.setAttribute('aria-label', '流光颜色 B')
+  const colorBLabel = labelFor(doc, colorB, '流光颜色 B')
 
   const actions = doc.createElement('div')
   actions.className = 'dsh-thinking-status-customizer-actions'
