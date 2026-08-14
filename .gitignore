@@ -1,3 +1,77 @@
 node_modules/
 coverage/
 *.tgz
+
+# Environment variables and local overrides
+.env
+.env.*
+.envrc
+.dev.vars
+.dev.vars.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Private keys, certificates containing private material, and key stores
+*.key
+*.pem
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.*
+id_dsa
+id_dsa.*
+id_ecdsa
+id_ecdsa.*
+id_ed25519
+id_ed25519.*
+
+# Package-manager and registry credentials
+.npmrc
+.yarnrc.yml
+.pypirc
+.netrc
+_netrc
+.git-credentials
+
+# Cloud, service-account, and local authentication credentials
+.aws/
+.azure/
+.config/gcloud/
+.config/gh/hosts.yml
+.docker/config.json
+application_default_credentials.json
+service-account*.json
+*service-account*.json
+google-application-credentials*.json
+credentials.json
+client_secret*.json
+oauth*.json
+auth.json
+
+# Infrastructure and cluster secrets
+*.tfvars
+*.tfvars.json
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+kubeconfig
+kubeconfig.*
+.kube/
+
+# Generic local secret stores
+*.secret
+*.secrets
+secrets/
+.secrets/
+*.agekey
+*.htpasswd
+.vault-token
+.vault_pass
+vault-password*
+*.kdbx
+*.ovpn
