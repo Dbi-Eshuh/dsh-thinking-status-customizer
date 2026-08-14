@@ -39,7 +39,7 @@ export interface ClientEffectOwner {
 /** Defaults used when storage is missing, corrupted, or invalid. */
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   enabled: true,
-  text: '正在思考中…',
+  text: '正在吃饭中...',
   colorA: '#7c3aed',
   colorB: '#22c55e',
 })
@@ -223,11 +223,6 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   controls.close.addEventListener('click', closeDialog)
   browser.addEventListener('storage', onStorage)
 
-  const observer = typeof browser.MutationObserver === 'undefined'
-    ? undefined
-    : new browser.MutationObserver(updateCompatibilityStatus)
-  observer?.observe(root, { childList: true, subtree: true })
-
   doc.head.append(style)
   doc.body.append(controls.button, controls.dialog)
   syncControls()
@@ -237,7 +232,6 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   return () => {
     if (disposed) return
     disposed = true
-    observer?.disconnect()
     controls.button.removeEventListener('click', openDialog)
     controls.form.removeEventListener('submit', onSubmit)
     controls.restore.removeEventListener('click', restoreDefaults)
@@ -257,27 +251,45 @@ function createStyle(doc: Document): HTMLStyleElement {
   style.dataset.dshThinkingStatusCustomizer = 'style'
   style.textContent = `
 html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR} {
+  animation: none !important;
+  background: none !important;
   color: transparent !important;
-  position: relative;
+  font-size: 0 !important;
+  -webkit-text-fill-color: transparent !important;
 }
 html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR}::before {
-  color: var(${COLOR_A_PROPERTY});
+  animation: dsh-thinking-status-customizer-flow 1.8s linear infinite;
+  background: linear-gradient(
+    90deg,
+    var(${COLOR_A_PROPERTY}) 0%,
+    var(${COLOR_A_PROPERTY}) 35%,
+    var(${COLOR_B_PROPERTY}) 50%,
+    var(${COLOR_A_PROPERTY}) 65%,
+    var(${COLOR_A_PROPERTY}) 100%
+  );
+  background-clip: text;
+  background-position: 100% 0;
+  background-size: 250% 100%;
+  color: transparent;
   content: var(${TEXT_PROPERTY});
-  font: inherit;
-  left: 0;
-  position: absolute;
-  text-shadow: 0 0 12px var(${COLOR_B_PROPERTY});
-  top: 0;
+  font: var(--dsw-font-s-strong-14);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR}::after {
-  background: var(${COLOR_B_PROPERTY});
-  border-radius: 999px;
-  content: "";
-  display: inline-block;
-  height: 0.45em;
-  margin-left: 0.45em;
-  vertical-align: middle;
-  width: 0.45em;
+html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR} > span[aria-hidden="true"] {
+  font: var(--dsw-font-xs-13);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes dsh-thinking-status-customizer-flow {
+  to { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR}::before {
+    animation: none;
+    background-position: 0 0;
+    background-size: 100% 100%;
+  }
 }
 #${BUTTON_ID} {
   background: #161b22;

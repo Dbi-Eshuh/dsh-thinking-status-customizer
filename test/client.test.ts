@@ -1,5 +1,5 @@
 import { JSDOM } from 'jsdom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_SETTINGS,
   MAX_TEXT_CODE_POINTS,
@@ -34,6 +34,9 @@ describe('thinking status CSS isolation', () => {
     expect(STATUS_SELECTOR).toBe('[data-conversation-scroll] [role="status"][aria-live="polite"]')
     expect(style.textContent).toContain(STATUS_SELECTOR)
     expect(style.textContent).not.toContain('[role="status"] {')
+    expect(style.textContent).toContain('font-size: 0 !important')
+    expect(style.textContent).toContain('dsh-thinking-status-customizer-flow')
+    expect(style.textContent).not.toContain('position: absolute')
     expect(dom.window.document.querySelector('#unrelated')?.textContent).toBe('Unrelated status')
     expect(dom.window.document.querySelector('#turn span')?.textContent).toBe('15s')
   })
@@ -77,6 +80,7 @@ describe('settings persistence and validation', () => {
     dom.window.localStorage.setItem(STORAGE_KEY, '{not JSON')
     expect(loadSettings(dom.window.localStorage)).toEqual(DEFAULT_SETTINGS)
     expect(loadSettings(undefined)).toEqual(DEFAULT_SETTINGS)
+    expect(DEFAULT_SETTINGS.text).toBe('正在吃饭中...')
     expect(validateSettings({ ...DEFAULT_SETTINGS, text: ' '.repeat(2) }).ok).toBe(false)
     expect(validateSettings({ ...DEFAULT_SETTINGS, text: 'x'.repeat(MAX_TEXT_CODE_POINTS + 1) }).ok).toBe(false)
     expect(validateSettings({ ...DEFAULT_SETTINGS, colorA: '#12345G' }).ok).toBe(false)
@@ -84,23 +88,14 @@ describe('settings persistence and validation', () => {
 })
 
 describe('lifecycle', () => {
-  it('removes plugin DOM, visual state, listener-owned behavior, and observer on cleanup and reload', () => {
+  it('removes plugin DOM, visual state, and listener-owned behavior on cleanup and reload', () => {
     const dom = page()
-    const disconnected = vi.fn()
-    class FakeObserver {
-      constructor(_callback: MutationCallback) {}
-      observe = vi.fn()
-      disconnect = disconnected
-    }
-    Object.defineProperty(dom.window, 'MutationObserver', { value: FakeObserver })
-
     const cleanup = mountThinkingStatusCustomizer(dom.window.document)
     const root = dom.window.document.documentElement
     expect(dom.window.document.getElementById('dsh-thinking-status-customizer-button')).not.toBeNull()
     expect(root.hasAttribute('data-dsh-thinking-status-customizer')).toBe(true)
 
     cleanup()
-    expect(disconnected).toHaveBeenCalledOnce()
     expect(dom.window.document.getElementById('dsh-thinking-status-customizer-style')).toBeNull()
     expect(dom.window.document.getElementById('dsh-thinking-status-customizer-button')).toBeNull()
     expect(dom.window.document.getElementById('dsh-thinking-status-customizer-settings')).toBeNull()

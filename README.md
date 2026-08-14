@@ -19,13 +19,13 @@ Remove it with:
 dsh plugin --profile web remove dsh-thinking-status-customizer
 ```
 
-The bundle patch inserts one row. Its `dsh.client` declaration loads only on the `web` platform and immediately registers the browser plugin.
+The bundle patch inserts one row. Its `dsh.client` declaration loads only on the `web` platform.
 
 ## Behavior and privacy
 
-Use the floating **思考状态** button to enable or disable the replacement, set a label, choose two colors, save, or restore defaults. Settings are stored only in the browser's `localStorage` under `dsh-thinking-status-customizer:v1`; no setting, status text, or model interaction leaves the browser. Corrupt or unavailable storage falls back to defaults without throwing.
+Use the floating **思考状态** button to enable or disable the replacement, set a label, choose two flow colors, save, or restore defaults. Settings are stored only in the browser's `localStorage` under `dsh-thinking-status-customizer:v1`; no setting, status text, or model interaction leaves the browser. Corrupt or unavailable storage falls back to defaults without throwing.
 
-The stylesheet is deliberately limited to `[data-conversation-scroll] [role="status"][aria-live="polite"]`. It uses pseudo-elements and plugin-owned root custom properties; it does not observe or mutate DSH `TurnStatus` nodes, rewrite `textContent`, or target unrelated live-status elements. Disabling or unloading removes the style, settings DOM, root attributes/custom properties, observer, and listeners immediately.
+The stylesheet is deliberately limited to `[data-conversation-scroll] [role="status"][aria-live="polite"]`. It uses a layout-participating pseudo-element and plugin-owned root custom properties; it does not observe or mutate DSH `TurnStatus` nodes, rewrite `textContent`, or target unrelated live-status elements. The original status remains in the accessibility DOM, so this setting changes visual copy only. Disabling or unloading removes the style, settings DOM, root attributes/custom properties, and listeners immediately.
 
 ## Compatibility
 
