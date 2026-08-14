@@ -17,6 +17,8 @@ dsh --profile web --dump-config
 
 Open the floating **思考状态** button after restart. The dialog can enable or disable the visual replacement, change its text, choose two flow colors, save the settings, or restore defaults.
 
+The settings panel inherits DSH Web's light or dark theme tokens and previews text and color edits before they are saved.
+
 Remove the plugin and restart DSH Web to restore the built-in presentation:
 
 ```sh

@@ -36,7 +36,8 @@ describe('thinking status CSS isolation', () => {
     expect(style.textContent).not.toContain('[role="status"] {')
     expect(style.textContent).toContain('font-size: 0 !important')
     expect(style.textContent).toContain('dsh-thinking-status-customizer-flow')
-    expect(style.textContent).not.toContain('position: absolute')
+    const replacementRule = style.textContent!.split(`${STATUS_SELECTOR}::before {`)[1]!.split('}')[0]!
+    expect(replacementRule).not.toContain('position: absolute')
     expect(dom.window.document.querySelector('#unrelated')?.textContent).toBe('Unrelated status')
     expect(dom.window.document.querySelector('#turn span')?.textContent).toBe('15s')
   })
@@ -58,6 +59,32 @@ describe('thinking status CSS isolation', () => {
 })
 
 describe('settings persistence and validation', () => {
+  it('uses DSH theme tokens and previews edits before saving', () => {
+    const dom = page()
+    const cleanup = mountThinkingStatusCustomizer(dom.window.document)
+    cleanups.push(cleanup)
+    const document = dom.window.document
+    const style = document.getElementById('dsh-thinking-status-customizer-style')!
+    const trigger = document.getElementById('dsh-thinking-status-customizer-button') as HTMLButtonElement
+    const dialog = document.getElementById('dsh-thinking-status-customizer-settings') as HTMLElement
+
+    expect(style.textContent).toContain('var(--dsw-alias-bg-layer-2)')
+    expect(style.textContent).toContain('var(--dsw-alias-button-floating-fill)')
+    expect(style.textContent).not.toContain('#111827')
+    trigger.click()
+    expect(dialog.hidden).toBe(false)
+    expect(dialog.querySelector('.dsh-thinking-status-customizer-preview')?.textContent).toBe(DEFAULT_SETTINGS.text)
+
+    const text = dialog.querySelector<HTMLInputElement>('input[name="text"]')!
+    text.value = '思考中...'
+    text.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    expect(dialog.querySelector('.dsh-thinking-status-customizer-preview')?.textContent).toBe('思考中...')
+
+    dialog.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(dialog.hidden).toBe(true)
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+  })
+
   it('persists a valid custom label and escapes it as one CSS string', () => {
     const dom = page()
     const cleanup = mountThinkingStatusCustomizer(dom.window.document)
