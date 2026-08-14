@@ -90,7 +90,8 @@ export function validateSettings(value: unknown): SettingsValidation {
  * @param storage - The browser localStorage implementation.
  * @returns Valid saved settings, or defaults after a missing/corrupt value.
  */
-export function loadSettings(storage: Storage): Settings {
+export function loadSettings(storage: Storage | undefined): Settings {
+  if (storage === undefined) return { ...DEFAULT_SETTINGS }
   try {
     const raw = storage.getItem(STORAGE_KEY)
     if (raw === null) return { ...DEFAULT_SETTINGS }
@@ -125,7 +126,7 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   const root = doc.documentElement
   const style = createStyle(doc)
   const controls = createControls(doc)
-  const storage = browser.localStorage
+  const storage = getStorage(browser)
   let settings = loadSettings(storage)
   let disposed = false
 
@@ -154,6 +155,7 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   }
 
   const persist = (): boolean => {
+    if (storage === undefined) return false
     try {
       storage.setItem(STORAGE_KEY, JSON.stringify(settings))
       return true
@@ -400,6 +402,15 @@ function clearVisualState(root: HTMLElement): void {
   root.style.removeProperty(TEXT_PROPERTY)
   root.style.removeProperty(COLOR_A_PROPERTY)
   root.style.removeProperty(COLOR_B_PROPERTY)
+}
+
+/** Read localStorage without letting browser privacy policy abort plugin loading. */
+function getStorage(browser: Window): Storage | undefined {
+  try {
+    return browser.localStorage
+  } catch {
+    return undefined
+  }
 }
 
 /** Narrow unknown values without using hostile-input dependencies. */

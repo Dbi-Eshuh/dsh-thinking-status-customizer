@@ -76,6 +76,7 @@ describe('settings persistence and validation', () => {
     const dom = page()
     dom.window.localStorage.setItem(STORAGE_KEY, '{not JSON')
     expect(loadSettings(dom.window.localStorage)).toEqual(DEFAULT_SETTINGS)
+    expect(loadSettings(undefined)).toEqual(DEFAULT_SETTINGS)
     expect(validateSettings({ ...DEFAULT_SETTINGS, text: ' '.repeat(2) }).ok).toBe(false)
     expect(validateSettings({ ...DEFAULT_SETTINGS, text: 'x'.repeat(MAX_TEXT_CODE_POINTS + 1) }).ok).toBe(false)
     expect(validateSettings({ ...DEFAULT_SETTINGS, colorA: '#12345G' }).ok).toBe(false)
