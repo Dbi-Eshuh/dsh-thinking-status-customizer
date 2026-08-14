@@ -2,7 +2,30 @@
   "name": "dsh-thinking-status-customizer",
   "version": "0.1.0",
   "description": "A lifecycle-safe CSS-only customizer for the DSH Web thinking status.",
+  "author": {
+    "name": "Dbi-Eshuh",
+    "url": "https://github.com/Dbi-Eshuh"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dbi-Eshuh/dsh-thinking-status-customizer.git"
+  },
+  "homepage": "https://github.com/Dbi-Eshuh/dsh-thinking-status-customizer#readme",
+  "bugs": {
+    "url": "https://github.com/Dbi-Eshuh/dsh-thinking-status-customizer/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "web-ui",
+    "css"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -15,6 +38,8 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
+    "README.zh.md",
+    "assets",
     "LICENSE"
   ],
   "dsh": {
@@ -29,7 +54,11 @@
     "build": "node ./scripts/build.mjs",
     "test": "vitest run",
     "check": "tsc --noEmit",
+    "verify": "npm run check && npm test && npm run build && git diff --exit-code -- lib && npm pack --dry-run",
     "pack:dry-run": "npm pack --dry-run"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
