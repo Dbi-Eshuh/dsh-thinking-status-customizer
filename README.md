@@ -4,6 +4,18 @@
 
 A CSS-only DSH Web plugin that customizes the visible running-turn text and its two-color flow effect without modifying DSH source or rewriting the status DOM.
 
+## Preview
+
+### Dark theme
+
+![DSH Web dark theme with the thinking status settings open](assets/harness-dark-preview.png)
+
+### Light theme
+
+![DSH Web light theme with the thinking status settings open](assets/harness-light-preview.png)
+
+### Settings panel
+
 ![Thinking status settings](assets/settings-preview.png)
 
 ## Install

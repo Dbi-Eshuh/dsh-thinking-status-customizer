@@ -4,6 +4,18 @@
 
 这是一个纯 CSS 的 DSH Web 插件。它可以自定义运行中状态的可见文字和双色流光效果，不修改 DSH 源码，也不重写状态元素的 DOM。
 
+## 效果预览
+
+### 深色主题
+
+![DSH Web 深色主题与打开的思考状态设置栏](assets/harness-dark-preview.png)
+
+### 浅色主题
+
+![DSH Web 浅色主题与打开的思考状态设置栏](assets/harness-light-preview.png)
+
+### 设置栏特写
+
 ![思考状态设置](assets/settings-preview.png)
 
 ## 安装
