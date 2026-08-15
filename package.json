@@ -1,7 +1,7 @@
 {
   "name": "dsh-thinking-status-customizer",
-  "version": "0.2.0",
-  "description": "A lifecycle-safe CSS-only customizer for the DSH Web thinking status.",
+  "version": "0.2.1",
+  "description": "Customize DSH Web thinking status with custom flowing text, animated GIF/APNG/WebP, or combined image-and-text modes.",
   "author": {
     "name": "Dbi-Eshuh",
     "url": "https://github.com/Dbi-Eshuh"
@@ -19,6 +19,9 @@
     "deepseek-harness",
     "dsh",
     "dsh-plugin",
+    "thinking-status",
+    "animated-gif",
+    "localization",
     "cordis",
     "web-ui",
     "css"
@@ -49,6 +52,9 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-locale"
+      ],
       "platform": "web"
     }
   },

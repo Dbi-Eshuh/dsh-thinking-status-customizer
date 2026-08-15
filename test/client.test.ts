@@ -9,12 +9,14 @@ import {
   MAX_TEXT_CODE_POINTS,
   STATUS_SELECTOR,
   STORAGE_KEY,
+  type Localization,
   escapeCssString,
   imageSourceToCssUrl,
   loadSettings,
   mountThinkingStatusCustomizer,
   validateSettings,
 } from '../src/client.js'
+import { type LocaleId, type MessageKey, type MessageParams, translate } from '../src/locales.js'
 
 const cleanups: Array<() => void> = []
 
@@ -27,6 +29,27 @@ function page(): JSDOM {
     <div role="status" aria-live="polite" id="unrelated">Unrelated status</div>
     <section data-conversation-scroll><div role="status" aria-live="polite" id="turn">正在吃饭中...<span aria-hidden>15s</span></div></section>
   </body></html>`, { url: 'https://dsh.test/' })
+}
+
+function mutableLocalization(initial: LocaleId): {
+  localization: Localization
+  setLocale(locale: LocaleId): void
+} {
+  let active = initial
+  const listeners = new Set<() => void>()
+  return {
+    localization: {
+      t: (key: MessageKey, params?: MessageParams) => translate(active, key, params),
+      subscribe: (listener) => {
+        listeners.add(listener)
+        return () => { listeners.delete(listener) }
+      },
+    },
+    setLocale: (locale) => {
+      active = locale
+      for (const listener of listeners) listener()
+    },
+  }
 }
 
 describe('thinking status CSS isolation', () => {
@@ -105,6 +128,7 @@ describe('thinking status CSS isolation', () => {
     expect(root.getAttribute('data-dsh-thinking-status-customizer-mode')).toBe('image-text')
     expect(root.style.getPropertyValue('--dsh-thinking-status-customizer-text')).toBe('"正在思考中..."')
     expect(style).toContain('dsh-thinking-status-customizer-image-text-flow')
+    expect(style).toContain('background-repeat: no-repeat, repeat')
     expect(style).toContain('padding-left: calc(var(--dsh-thinking-status-customizer-image-size) + 6px)')
     expect(document.querySelector('#turn span')?.textContent).toBe('15s')
     expect(JSON.parse(dom.window.localStorage.getItem(STORAGE_KEY)!).mode).toBe('image-text')
@@ -112,6 +136,40 @@ describe('thinking status CSS isolation', () => {
 })
 
 describe('settings persistence and validation', () => {
+  it('switches mounted copy with DSH locale changes without losing draft input', () => {
+    const dom = page()
+    const locale = mutableLocalization('zh')
+    const cleanup = mountThinkingStatusCustomizer(dom.window.document, locale.localization)
+    cleanups.push(cleanup)
+    const document = dom.window.document
+    const button = document.getElementById('dsh-thinking-status-customizer-button') as HTMLButtonElement
+    const dialog = document.getElementById('dsh-thinking-status-customizer-settings')!
+    const text = dialog.querySelector<HTMLInputElement>('input[name="text"]')!
+
+    button.click()
+    text.value = '未保存的自定义文字'
+    const originalDialog = dialog
+    locale.setLocale('en')
+
+    expect(document.getElementById('dsh-thinking-status-customizer-settings')).toBe(originalDialog)
+    expect(button.textContent).toContain('Thinking status')
+    expect(button.getAttribute('aria-label')).toBe('Close thinking status appearance settings')
+    expect(dialog.getAttribute('aria-label')).toBe('Thinking status appearance settings')
+    expect(dialog.querySelector('h2')?.textContent).toBe('Thinking status appearance')
+    expect(dialog.querySelector<HTMLOptionElement>('option[value="image-text"]')?.textContent).toBe('Image and text')
+    expect(dialog.querySelector<HTMLOptionElement>('option[value="text"]')?.textContent).toBe('Custom text (flow effect)')
+    expect(dialog.querySelector<HTMLElement>('label[for="dsh-thinking-status-customizer-colorCount"] .dsh-thinking-status-customizer-label-title')?.textContent)
+      .toBe('Color count')
+    expect(dialog.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent).toBe('Save settings')
+    expect(dialog.querySelector('[data-dsh-thinking-status-customizer-compatibility]')?.textContent)
+      .toBe('Connected to the DSH thinking status')
+    expect(text.value).toBe('未保存的自定义文字')
+
+    locale.setLocale('zh')
+    expect(button.textContent).toContain('思考状态')
+    expect(text.value).toBe('未保存的自定义文字')
+  })
+
   it('uses DSH theme tokens and previews edits before saving', () => {
     const dom = page()
     const cleanup = mountThinkingStatusCustomizer(dom.window.document)
@@ -154,14 +212,27 @@ describe('settings persistence and validation', () => {
     cleanups.push(cleanup)
     const form = dom.window.document.querySelector('form')!
     form.querySelector<HTMLInputElement>('input[name="text"]')!.value = '危险"; color: red; /*'
-    form.querySelector<HTMLInputElement>('input[name="colorA"]')!.value = '#123456'
-    form.querySelector<HTMLInputElement>('input[name="colorB"]')!.value = '#abcdef'
+    form.querySelector<HTMLSelectElement>('select[name="colorCount"]')!.value = '3'
+    form.querySelector<HTMLInputElement>('input[name="color1"]')!.value = '#123456'
+    form.querySelector<HTMLInputElement>('input[name="color2"]')!.value = '#abcdef'
+    form.querySelector<HTMLInputElement>('input[name="color3"]')!.value = '#fedcba'
+    form.querySelector<HTMLSelectElement>('select[name="direction"]')!.value = 'bottom-to-top'
+    form.querySelector<HTMLSelectElement>('select[name="flowMode"]')!.value = 'alternate'
     form.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }))
 
     const saved = JSON.parse(dom.window.localStorage.getItem(STORAGE_KEY)!)
     expect(saved.text).toBe('危险"; color: red; /*')
-    expect(dom.window.document.documentElement.style.getPropertyValue('--dsh-thinking-status-customizer-text'))
+    const rootStyle = dom.window.document.documentElement.style
+    expect(saved.colors).toEqual(['#123456', '#abcdef', '#fedcba'])
+    expect(saved.direction).toBe('bottom-to-top')
+    expect(saved.flowMode).toBe('alternate')
+    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-text'))
       .toBe(escapeCssString(saved.text))
+    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-gradient'))
+      .toContain('linear-gradient(180deg, #123456 0%, #abcdef 25%, #fedcba 50%')
+    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-start')).toBe('0 100%')
+    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-end')).toBe('0 -100%')
+    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-direction')).toBe('alternate')
     expect(escapeCssString('x"; color: red; /*')).toBe('"x\\"; color: red; /*"')
   })
 
@@ -173,14 +244,34 @@ describe('settings persistence and validation', () => {
     expect(DEFAULT_SETTINGS.text).toBe('正在吃饭中...')
     expect(validateSettings({ ...DEFAULT_SETTINGS, text: ' '.repeat(2) }).ok).toBe(false)
     expect(validateSettings({ ...DEFAULT_SETTINGS, text: 'x'.repeat(MAX_TEXT_CODE_POINTS + 1) }).ok).toBe(false)
-    expect(validateSettings({ ...DEFAULT_SETTINGS, colorA: '#12345G' }).ok).toBe(false)
+    expect(validateSettings({ ...DEFAULT_SETTINGS, colors: ['#12345G', '#abcdef'] }).ok).toBe(false)
+    expect(validateSettings({ ...DEFAULT_SETTINGS, colors: ['#abcdef'] }).ok).toBe(false)
+    expect(validateSettings({ ...DEFAULT_SETTINGS, colors: Array(6).fill('#abcdef') }).ok).toBe(false)
+    expect(validateSettings({ ...DEFAULT_SETTINGS, direction: 'diagonal' }).ok).toBe(false)
+    expect(validateSettings({ ...DEFAULT_SETTINGS, flowMode: 'pulse' }).ok).toBe(false)
     expect(validateSettings({ ...DEFAULT_SETTINGS, imageSource: 'javascript:alert(1)' }).ok).toBe(false)
     expect(validateSettings({ ...DEFAULT_SETTINGS, imageSource: 'http://example.test/dance.gif' }).ok).toBe(false)
     expect(validateSettings({ ...DEFAULT_SETTINGS, imageSize: 97 }).ok).toBe(false)
+    expect(validateSettings(
+      { ...DEFAULT_SETTINGS, text: '' },
+      (key, params) => translate('en', key, params),
+    )).toEqual({ ok: false, message: 'Status text cannot be empty.' })
     expect(validateSettings({
       ...DEFAULT_SETTINGS,
       imageSource: 'builtin:shigure-ui-dance-pixel-v4-hybrid-144f',
     })).toEqual({ ok: true, value: DEFAULT_SETTINGS })
+    expect(validateSettings({
+      enabled: true,
+      mode: 'text',
+      text: DEFAULT_SETTINGS.text,
+      colorA: '#112233',
+      colorB: '#aabbcc',
+      imageSource: BUILTIN_IMAGE_SOURCE,
+      imageSize: 48,
+    })).toEqual({
+      ok: true,
+      value: { ...DEFAULT_SETTINGS, colors: ['#112233', '#aabbcc'] },
+    })
     const oversizedDataUrl = `data:image/gif;base64,${'A'.repeat(MAX_IMAGE_DATA_URL_CHARS + 1)}`
     expect(validateSettings({ ...DEFAULT_SETTINGS, imageSource: oversizedDataUrl })).toEqual({
       ok: false,
