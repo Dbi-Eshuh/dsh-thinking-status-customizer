@@ -73,6 +73,16 @@ describe('settings persistence and validation', () => {
     expect(style.textContent).not.toContain('#111827')
     trigger.click()
     expect(dialog.hidden).toBe(false)
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    expect(trigger.getAttribute('aria-label')).toBe('关闭思考状态样式设置')
+
+    trigger.click()
+    expect(dialog.hidden).toBe(true)
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(trigger.getAttribute('aria-label')).toBe('打开思考状态样式设置')
+
+    trigger.click()
+    expect(dialog.hidden).toBe(false)
     expect(dialog.querySelector('.dsh-thinking-status-customizer-preview')?.textContent).toBe(DEFAULT_SETTINGS.text)
 
     const text = dialog.querySelector<HTMLInputElement>('input[name="text"]')!

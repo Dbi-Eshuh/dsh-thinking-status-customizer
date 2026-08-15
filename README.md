@@ -23,11 +23,11 @@ A CSS-only DSH Web plugin that customizes the visible running-turn text and its 
 Install the tagged release into a Web profile, inspect the resolved configuration, then restart DSH Web:
 
 ```sh
-dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.1.0
+dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.1.1
 dsh --profile web --dump-config
 ```
 
-Open the floating **思考状态** button after restart. The dialog can enable or disable the visual replacement, change its text, choose two flow colors, save the settings, or restore defaults.
+Open the floating **思考状态** button after restart. Click the same button again, use the close button, or press Escape to close the panel. The dialog can enable or disable the visual replacement, change its text, choose two flow colors, save the settings, or restore defaults.
 
 The settings panel inherits DSH Web's light or dark theme tokens and previews text and color edits before they are saved.
 
