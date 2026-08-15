@@ -1,5 +1,7 @@
 /** CSS-only browser customizer for the visible DSH thinking status. */
 
+import builtinAnimationUrl from '../assets/animations/dance-reference-transparent.gif'
+
 /** The only DSH status selector this plugin styles or queries. */
 export const STATUS_SELECTOR = '[data-conversation-scroll] [role="status"][aria-live="polite"]'
 
@@ -9,10 +11,27 @@ export const STORAGE_KEY = 'dsh-thinking-status-customizer:v1'
 /** Maximum Unicode code points allowed in the replacement label. */
 export const MAX_TEXT_CODE_POINTS = 80
 
+/** Largest local animation accepted by the browser settings panel. */
+export const MAX_IMAGE_FILE_BYTES = 20 * 1024 * 1024
+
+/** Files above this size use a temporary object URL instead of localStorage. */
+export const MAX_PERSISTED_IMAGE_FILE_BYTES = 2 * 1024 * 1024
+
+/** Maximum Data URL length accepted for CSS and browser-local persistence. */
+export const MAX_IMAGE_DATA_URL_CHARS = 3 * 1024 * 1024
+
+/** Persisted token for the animation bundled into the client module. */
+export const BUILTIN_IMAGE_SOURCE = 'builtin:dance-reference-transparent'
+
+const LEGACY_BUILTIN_IMAGE_SOURCE = 'builtin:shigure-ui-dance-pixel-v4-hybrid-144f'
+
 const ROOT_ATTRIBUTE = 'data-dsh-thinking-status-customizer'
 const TEXT_PROPERTY = '--dsh-thinking-status-customizer-text'
 const COLOR_A_PROPERTY = '--dsh-thinking-status-customizer-color-a'
 const COLOR_B_PROPERTY = '--dsh-thinking-status-customizer-color-b'
+const IMAGE_PROPERTY = '--dsh-thinking-status-customizer-image'
+const IMAGE_SIZE_PROPERTY = '--dsh-thinking-status-customizer-image-size'
+const MODE_ATTRIBUTE = 'data-dsh-thinking-status-customizer-mode'
 const STYLE_ID = 'dsh-thinking-status-customizer-style'
 const SETTINGS_ID = 'dsh-thinking-status-customizer-settings'
 const BUTTON_ID = 'dsh-thinking-status-customizer-button'
@@ -20,9 +39,12 @@ const BUTTON_ID = 'dsh-thinking-status-customizer-button'
 /** User-controlled display settings. */
 export interface Settings {
   enabled: boolean
+  mode: 'text' | 'image' | 'image-text'
   text: string
   colorA: string
   colorB: string
+  imageSource: string
+  imageSize: number
 }
 
 /** Result of validating a candidate settings object. */
@@ -39,9 +61,12 @@ export interface ClientEffectOwner {
 /** Defaults used when storage is missing, corrupted, or invalid. */
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   enabled: true,
+  mode: 'text',
   text: '正在吃饭中...',
   colorA: '#7c3aed',
   colorB: '#22c55e',
+  imageSource: BUILTIN_IMAGE_SOURCE,
+  imageSize: 48,
 })
 
 /**
@@ -62,6 +87,12 @@ export function escapeCssString(value: string): string {
   return `"${escaped}"`
 }
 
+/** Convert a validated image source to one CSS `url()` token. */
+export function imageSourceToCssUrl(source: string): string {
+  const resolved = source === BUILTIN_IMAGE_SOURCE ? builtinAnimationUrl : source
+  return `url(${escapeCssString(resolved)})`
+}
+
 /**
  * Validate settings entered through the dialog or read from localStorage.
  * @param value - Unknown candidate value.
@@ -70,6 +101,10 @@ export function escapeCssString(value: string): string {
 export function validateSettings(value: unknown): SettingsValidation {
   if (!isRecord(value)) return { ok: false, message: '设置数据不是对象。' }
   if (typeof value.enabled !== 'boolean') return { ok: false, message: '启用状态无效。' }
+  const mode = value.mode === undefined ? DEFAULT_SETTINGS.mode : value.mode
+  if (mode !== 'text' && mode !== 'image' && mode !== 'image-text') {
+    return { ok: false, message: '显示模式无效。' }
+  }
   if (typeof value.text !== 'string') return { ok: false, message: '状态文字无效。' }
   const text = value.text.trim()
   if (text.length === 0) return { ok: false, message: '状态文字不能为空。' }
@@ -79,9 +114,20 @@ export function validateSettings(value: unknown): SettingsValidation {
   if (!isColor(value.colorA) || !isColor(value.colorB)) {
     return { ok: false, message: '颜色必须是 #RRGGBB。' }
   }
+  const savedImageSource = value.imageSource === undefined ? DEFAULT_SETTINGS.imageSource : value.imageSource
+  const imageSource = savedImageSource === LEGACY_BUILTIN_IMAGE_SOURCE ? BUILTIN_IMAGE_SOURCE : savedImageSource
+  if (!isImageSource(imageSource)) {
+    return { ok: false, message: isOversizedImageDataUrl(imageSource)
+      ? 'Data URL 太大，请改用本地文件上传；大文件会使用临时对象 URL。'
+      : '图片必须使用内置动画、HTTPS 地址或 GIF/APNG/WebP Data URL。' }
+  }
+  const imageSize = value.imageSize === undefined ? DEFAULT_SETTINGS.imageSize : value.imageSize
+  if (typeof imageSize !== 'number' || !Number.isInteger(imageSize) || imageSize < 24 || imageSize > 96) {
+    return { ok: false, message: '图片尺寸必须是 24 到 96 像素的整数。' }
+  }
   return {
     ok: true,
-    value: { enabled: value.enabled, text, colorA: value.colorA, colorB: value.colorB },
+    value: { enabled: value.enabled, mode, text, colorA: value.colorA, colorB: value.colorB, imageSource, imageSize },
   }
 }
 
@@ -128,6 +174,7 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   const controls = createControls(doc)
   const storage = getStorage(browser)
   let settings = loadSettings(storage)
+  let temporaryImageUrl: string | undefined
   let disposed = false
 
   const applyVisualState = (next: Settings): void => {
@@ -136,21 +183,26 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
       return
     }
     root.setAttribute(ROOT_ATTRIBUTE, 'enabled')
+    root.setAttribute(MODE_ATTRIBUTE, next.mode)
     root.style.setProperty(TEXT_PROPERTY, escapeCssString(next.text))
     root.style.setProperty(COLOR_A_PROPERTY, next.colorA)
     root.style.setProperty(COLOR_B_PROPERTY, next.colorB)
+    root.style.setProperty(IMAGE_PROPERTY, imageSourceToCssUrl(next.imageSource))
+    root.style.setProperty(IMAGE_SIZE_PROPERTY, `${next.imageSize}px`)
   }
 
   const syncControls = (): void => {
     controls.enabled.checked = settings.enabled
+    controls.mode.value = settings.mode
     controls.text.value = settings.text
     controls.colorA.value = settings.colorA
     controls.colorB.value = settings.colorB
     controls.colorAValue.textContent = settings.colorA.toUpperCase()
     controls.colorBValue.textContent = settings.colorB.toUpperCase()
-    controls.preview.textContent = settings.text
-    controls.preview.style.setProperty(COLOR_A_PROPERTY, settings.colorA)
-    controls.preview.style.setProperty(COLOR_B_PROPERTY, settings.colorB)
+    controls.imageSource.value = settings.imageSource
+    controls.imageSize.value = String(settings.imageSize)
+    syncModeFields(controls, settings.mode)
+    renderPreview(controls, settings)
   }
 
   const updateCompatibilityStatus = (): void => {
@@ -160,14 +212,23 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   }
 
   const updateDraftPreview = (): void => {
-    controls.preview.textContent = controls.text.value.trim() || settings.text
-    controls.preview.style.setProperty(COLOR_A_PROPERTY, controls.colorA.value)
-    controls.preview.style.setProperty(COLOR_B_PROPERTY, controls.colorB.value)
+    const mode = parseMode(controls.mode.value)
+    syncModeFields(controls, mode)
+    renderPreview(controls, {
+      enabled: controls.enabled.checked,
+      mode,
+      text: controls.text.value.trim() || settings.text,
+      colorA: controls.colorA.value,
+      colorB: controls.colorB.value,
+      imageSource: isImageSource(controls.imageSource.value) ? controls.imageSource.value : settings.imageSource,
+      imageSize: Number.parseInt(controls.imageSize.value, 10) || settings.imageSize,
+    })
     controls.colorAValue.textContent = controls.colorA.value.toUpperCase()
     controls.colorBValue.textContent = controls.colorB.value.toUpperCase()
   }
 
   const persist = (): boolean => {
+    if (isTemporaryImageSource(settings.imageSource)) return false
     if (storage === undefined) return false
     try {
       storage.setItem(STORAGE_KEY, JSON.stringify(settings))
@@ -180,9 +241,12 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   const save = (): void => {
     const result = validateSettings({
       enabled: controls.enabled.checked,
+      mode: controls.mode.value,
       text: controls.text.value,
       colorA: controls.colorA.value,
       colorB: controls.colorB.value,
+      imageSource: controls.imageSource.value,
+      imageSize: Number(controls.imageSize.value),
     })
     if (!result.ok) {
       controls.status.textContent = result.message
@@ -191,12 +255,18 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
     settings = result.value
     syncControls()
     applyVisualState(settings)
-    controls.status.textContent = persist()
-      ? '已保存并应用。'
-      : '已应用；浏览器拒绝本地存储，刷新后会恢复默认值。'
+    controls.status.textContent = isTemporaryImageSource(settings.imageSource)
+      ? '已应用；大文件仅在当前标签页有效，刷新后需要重新选择。'
+      : persist()
+        ? '已保存并应用。'
+        : '已应用；浏览器拒绝本地存储，刷新后会恢复默认值。'
   }
 
   const restoreDefaults = (): void => {
+    if (temporaryImageUrl !== undefined) {
+      browser.URL.revokeObjectURL(temporaryImageUrl)
+      temporaryImageUrl = undefined
+    }
     settings = { ...DEFAULT_SETTINGS }
     syncControls()
     applyVisualState(settings)
@@ -234,15 +304,62 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   }
   const onStorage = (event: StorageEvent): void => {
     if (event.key !== STORAGE_KEY && event.key !== null) return
+    if (temporaryImageUrl !== undefined) {
+      browser.URL.revokeObjectURL(temporaryImageUrl)
+      temporaryImageUrl = undefined
+    }
     settings = loadSettings(storage)
     syncControls()
     applyVisualState(settings)
     controls.status.textContent = '已同步另一个标签页的设置。'
   }
+  const onImageFile = (): void => {
+    const file = controls.imageFile.files?.[0]
+    if (file === undefined) return
+    if (!['image/gif', 'image/png', 'image/webp', 'image/apng'].includes(file.type)) {
+      controls.status.textContent = '请选择 GIF、APNG 或 WebP 图片。'
+      controls.imageFile.value = ''
+      return
+    }
+    if (file.size > MAX_IMAGE_FILE_BYTES) {
+      controls.status.textContent = `图片不能超过 ${MAX_IMAGE_FILE_BYTES / 1024 / 1024} MB。`
+      controls.imageFile.value = ''
+      return
+    }
+    if (temporaryImageUrl !== undefined) browser.URL.revokeObjectURL(temporaryImageUrl)
+    if (file.size > MAX_PERSISTED_IMAGE_FILE_BYTES) {
+      temporaryImageUrl = browser.URL.createObjectURL(file)
+      controls.imageSource.value = temporaryImageUrl
+      updateDraftPreview()
+      controls.status.textContent = '大文件已载入；保存后仅在当前标签页有效，不会写入 localStorage。'
+      return
+    }
+    const reader = new browser.FileReader()
+    reader.addEventListener('load', () => {
+      if (typeof reader.result !== 'string') return
+      controls.imageSource.value = reader.result
+      updateDraftPreview()
+      controls.status.textContent = '图片已载入；保存设置后生效。'
+    }, { once: true })
+    reader.addEventListener('error', () => {
+      controls.status.textContent = '无法读取所选图片。'
+    }, { once: true })
+    reader.readAsDataURL(file)
+  }
+  const onImageSourceInput = (): void => {
+    if (isOversizedImageDataUrl(controls.imageSource.value)) {
+      controls.status.textContent = 'Data URL 太大，请改用本地文件上传；大文件会使用临时对象 URL。'
+    }
+    updateDraftPreview()
+  }
 
   controls.button.addEventListener('click', toggleDialog)
   controls.form.addEventListener('submit', onSubmit)
   controls.text.addEventListener('input', updateDraftPreview)
+  controls.mode.addEventListener('change', updateDraftPreview)
+  controls.imageSource.addEventListener('input', onImageSourceInput)
+  controls.imageSize.addEventListener('input', updateDraftPreview)
+  controls.imageFile.addEventListener('change', onImageFile)
   controls.colorA.addEventListener('input', updateDraftPreview)
   controls.colorB.addEventListener('input', updateDraftPreview)
   controls.restore.addEventListener('click', restoreDefaults)
@@ -262,12 +379,17 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
     controls.button.removeEventListener('click', toggleDialog)
     controls.form.removeEventListener('submit', onSubmit)
     controls.text.removeEventListener('input', updateDraftPreview)
+    controls.mode.removeEventListener('change', updateDraftPreview)
+    controls.imageSource.removeEventListener('input', onImageSourceInput)
+    controls.imageSize.removeEventListener('input', updateDraftPreview)
+    controls.imageFile.removeEventListener('change', onImageFile)
     controls.colorA.removeEventListener('input', updateDraftPreview)
     controls.colorB.removeEventListener('input', updateDraftPreview)
     controls.restore.removeEventListener('click', restoreDefaults)
     controls.close.removeEventListener('click', closeDialog)
     controls.dialog.removeEventListener('keydown', onDialogKeydown)
     browser.removeEventListener('storage', onStorage)
+    if (temporaryImageUrl !== undefined) browser.URL.revokeObjectURL(temporaryImageUrl)
     clearVisualState(root)
     style.remove()
     controls.button.remove()
@@ -288,7 +410,7 @@ html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR} {
   font-size: 0 !important;
   -webkit-text-fill-color: transparent !important;
 }
-html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR}::before {
+html[${ROOT_ATTRIBUTE}="enabled"][${MODE_ATTRIBUTE}="text"] ${STATUS_SELECTOR}::before {
   animation: dsh-thinking-status-customizer-flow 1.8s linear infinite;
   background: linear-gradient(
     90deg,
@@ -307,6 +429,44 @@ html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR}::before {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+html[${ROOT_ATTRIBUTE}="enabled"][${MODE_ATTRIBUTE}="image"] ${STATUS_SELECTOR}::before {
+  background-image: var(${IMAGE_PROPERTY});
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  content: '';
+  display: inline-block;
+  height: var(${IMAGE_SIZE_PROPERTY});
+  image-rendering: auto;
+  vertical-align: middle;
+  width: var(${IMAGE_SIZE_PROPERTY});
+}
+html[${ROOT_ATTRIBUTE}="enabled"][${MODE_ATTRIBUTE}="image-text"] ${STATUS_SELECTOR}::before {
+  align-items: center;
+  animation: dsh-thinking-status-customizer-image-text-flow 1.8s linear infinite;
+  background-clip: border-box, text;
+  background-image: var(${IMAGE_PROPERTY}), linear-gradient(
+    90deg,
+    var(${COLOR_A_PROPERTY}) 0%,
+    var(${COLOR_A_PROPERTY}) 35%,
+    var(${COLOR_B_PROPERTY}) 50%,
+    var(${COLOR_A_PROPERTY}) 65%,
+    var(${COLOR_A_PROPERTY}) 100%
+  );
+  background-position: left center, 100% 0;
+  background-repeat: no-repeat, no-repeat;
+  background-size: var(${IMAGE_SIZE_PROPERTY}) var(${IMAGE_SIZE_PROPERTY}), 250% 100%;
+  color: transparent;
+  content: var(${TEXT_PROPERTY});
+  display: inline-flex;
+  font: var(--dsw-font-s-strong-14);
+  height: var(${IMAGE_SIZE_PROPERTY});
+  image-rendering: auto;
+  padding-left: calc(var(${IMAGE_SIZE_PROPERTY}) + 6px);
+  vertical-align: middle;
+  -webkit-background-clip: border-box, text;
+  -webkit-text-fill-color: transparent;
+}
 html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR} > span[aria-hidden="true"] {
   font: var(--dsw-font-xs-13);
   font-weight: 400;
@@ -315,11 +475,24 @@ html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR} > span[aria-hidden="true"] 
 @keyframes dsh-thinking-status-customizer-flow {
   to { background-position: 0 0; }
 }
+@keyframes dsh-thinking-status-customizer-image-text-flow {
+  to { background-position: left center, 0 0; }
+}
 @media (prefers-reduced-motion: reduce) {
-  html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR}::before {
+  html[${ROOT_ATTRIBUTE}="enabled"][${MODE_ATTRIBUTE}="text"] ${STATUS_SELECTOR}::before {
     animation: none;
     background-position: 0 0;
     background-size: 100% 100%;
+  }
+  html[${ROOT_ATTRIBUTE}="enabled"][${MODE_ATTRIBUTE}="image-text"] ${STATUS_SELECTOR}::before {
+    animation: none;
+    background-position: left center, 0 0;
+    background-size: var(${IMAGE_SIZE_PROPERTY}) var(${IMAGE_SIZE_PROPERTY}), 100% 100%;
+  }
+  #${SETTINGS_ID} .dsh-thinking-status-customizer-preview[data-mode='image-text']::before {
+    animation: none;
+    background-position: left center, 0 0;
+    background-size: var(${IMAGE_SIZE_PROPERTY}) var(${IMAGE_SIZE_PROPERTY}), 100% 100%;
   }
 }
 #${BUTTON_ID} {
@@ -460,6 +633,44 @@ html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR} > span[aria-hidden="true"] 
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+#${SETTINGS_ID} .dsh-thinking-status-customizer-preview[data-mode='image'] {
+  animation: none;
+  background-clip: border-box;
+  background-image: var(${IMAGE_PROPERTY});
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  display: block;
+  height: var(${IMAGE_SIZE_PROPERTY});
+  image-rendering: auto;
+  width: var(${IMAGE_SIZE_PROPERTY});
+  -webkit-text-fill-color: initial;
+}
+#${SETTINGS_ID} .dsh-thinking-status-customizer-preview[data-mode='image-text'] {
+  animation: none;
+  background: none;
+  color: inherit;
+  overflow: visible;
+  -webkit-text-fill-color: initial;
+}
+#${SETTINGS_ID} .dsh-thinking-status-customizer-preview[data-mode='image-text']::before {
+  align-items: center;
+  animation: dsh-thinking-status-customizer-image-text-flow 1.8s linear infinite;
+  background-clip: border-box, text;
+  background-image: var(${IMAGE_PROPERTY}), linear-gradient(90deg, var(${COLOR_A_PROPERTY}) 0%, var(${COLOR_A_PROPERTY}) 35%, var(${COLOR_B_PROPERTY}) 50%, var(${COLOR_A_PROPERTY}) 65%, var(${COLOR_A_PROPERTY}) 100%);
+  background-position: left center, 100% 0;
+  background-repeat: no-repeat, no-repeat;
+  background-size: var(${IMAGE_SIZE_PROPERTY}) var(${IMAGE_SIZE_PROPERTY}), 250% 100%;
+  color: transparent;
+  content: var(${TEXT_PROPERTY});
+  display: inline-flex;
+  font: var(--dsw-font-s-strong-14);
+  height: var(${IMAGE_SIZE_PROPERTY});
+  image-rendering: auto;
+  padding-left: calc(var(${IMAGE_SIZE_PROPERTY}) + 6px);
+  -webkit-background-clip: border-box, text;
+  -webkit-text-fill-color: transparent;
+}
 #${SETTINGS_ID} .dsh-thinking-status-customizer-toggle-row {
   align-items: center;
   cursor: pointer;
@@ -511,6 +722,10 @@ html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR} > span[aria-hidden="true"] 
   outline-offset: 2px;
 }
 #${SETTINGS_ID} .dsh-thinking-status-customizer-field { display: grid; gap: 7px; }
+#${SETTINGS_ID} .dsh-thinking-status-customizer-field[hidden] { display: none; }
+#${SETTINGS_ID} select,
+#${SETTINGS_ID} input[type='url'],
+#${SETTINGS_ID} input[type='number'],
 #${SETTINGS_ID} .dsh-thinking-status-customizer-text-input {
   background: var(--dsw-alias-bg-layer-1);
   border: 1px solid var(--dsw-alias-border-l2);
@@ -521,6 +736,11 @@ html[${ROOT_ATTRIBUTE}="enabled"] ${STATUS_SELECTOR} > span[aria-hidden="true"] 
   outline: none;
   padding: 0 12px;
   width: 100%;
+}
+#${SETTINGS_ID} input[type='file'] {
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+  max-width: 100%;
 }
 #${SETTINGS_ID} .dsh-thinking-status-customizer-text-input:focus { border-color: var(--dsw-alias-brand-primary); }
 #${SETTINGS_ID} .dsh-thinking-status-customizer-color-grid {
@@ -673,6 +893,26 @@ function createControls(doc: Document): Controls {
   enabledCopy.append(enabledTitle, enabledHint)
   enabledLabel.append(enabledCopy, enabled, enabledSwitch)
 
+  const mode = doc.createElement('select')
+  mode.name = 'mode'
+  mode.setAttribute('aria-label', '显示模式')
+  const textMode = doc.createElement('option')
+  textMode.value = 'text'
+  textMode.textContent = '流光文字'
+  const imageMode = doc.createElement('option')
+  imageMode.value = 'image'
+  imageMode.textContent = '动态图片'
+  const imageTextMode = doc.createElement('option')
+  imageTextMode.value = 'image-text'
+  imageTextMode.textContent = '图文组合'
+  mode.append(textMode, imageMode, imageTextMode)
+  const modeLabel = labelFor(doc, mode, '')
+  modeLabel.className = 'dsh-thinking-status-customizer-field'
+  const modeTitle = doc.createElement('span')
+  modeTitle.className = 'dsh-thinking-status-customizer-label-title'
+  modeTitle.textContent = '显示模式'
+  modeLabel.prepend(modeTitle)
+
   const text = doc.createElement('input')
   text.type = 'text'
   text.name = 'text'
@@ -688,6 +928,54 @@ function createControls(doc: Document): Controls {
   textHint.className = 'dsh-thinking-status-customizer-hint'
   textHint.textContent = `最多 ${MAX_TEXT_CODE_POINTS} 个字符`
   textLabel.prepend(textTitle, textHint)
+
+  const imageSource = doc.createElement('input')
+  imageSource.type = 'text'
+  imageSource.className = 'dsh-thinking-status-customizer-text-input'
+  imageSource.name = 'imageSource'
+  imageSource.setAttribute('aria-label', '动态图片来源')
+  imageSource.placeholder = '内置动画或 HTTPS / Data URL'
+  const imageSourceLabel = labelFor(doc, imageSource, '')
+  imageSourceLabel.className = 'dsh-thinking-status-customizer-field'
+  imageSourceLabel.dataset.modeField = 'image image-text'
+  const imageSourceTitle = doc.createElement('span')
+  imageSourceTitle.className = 'dsh-thinking-status-customizer-label-title'
+  imageSourceTitle.textContent = '动态图片来源'
+  const imageSourceHint = doc.createElement('span')
+  imageSourceHint.className = 'dsh-thinking-status-customizer-hint'
+  imageSourceHint.textContent = '默认使用内置透明背景舞蹈 GIF；HTTPS 或 Data URL 建议使用小文件，大文件请从本地选择'
+  imageSourceLabel.prepend(imageSourceTitle, imageSourceHint)
+
+  const imageFile = doc.createElement('input')
+  imageFile.type = 'file'
+  imageFile.name = 'imageFile'
+  imageFile.accept = 'image/gif,image/png,image/webp,.apng'
+  imageFile.setAttribute('aria-label', '上传动态图片')
+  const imageFileLabel = labelFor(doc, imageFile, '')
+  imageFileLabel.className = 'dsh-thinking-status-customizer-field'
+  imageFileLabel.dataset.modeField = 'image image-text'
+  const imageFileTitle = doc.createElement('span')
+  imageFileTitle.className = 'dsh-thinking-status-customizer-label-title'
+  imageFileTitle.textContent = '从本地选择'
+  const imageFileHint = doc.createElement('span')
+  imageFileHint.className = 'dsh-thinking-status-customizer-hint'
+  imageFileHint.textContent = `GIF、APNG 或 WebP，最大 ${MAX_IMAGE_FILE_BYTES / 1024 / 1024} MB；超过 ${MAX_PERSISTED_IMAGE_FILE_BYTES / 1024 / 1024} MB 时仅当前标签页有效`
+  imageFileLabel.prepend(imageFileTitle, imageFileHint)
+
+  const imageSize = doc.createElement('input')
+  imageSize.type = 'number'
+  imageSize.name = 'imageSize'
+  imageSize.min = '24'
+  imageSize.max = '96'
+  imageSize.step = '1'
+  imageSize.setAttribute('aria-label', '图片尺寸')
+  const imageSizeLabel = labelFor(doc, imageSize, '')
+  imageSizeLabel.className = 'dsh-thinking-status-customizer-field'
+  imageSizeLabel.dataset.modeField = 'image image-text'
+  const imageSizeTitle = doc.createElement('span')
+  imageSizeTitle.className = 'dsh-thinking-status-customizer-label-title'
+  imageSizeTitle.textContent = '图片尺寸（像素）'
+  imageSizeLabel.prepend(imageSizeTitle)
 
   const colorA = doc.createElement('input')
   colorA.type = 'color'
@@ -742,7 +1030,9 @@ function createControls(doc: Document): Controls {
   status.className = 'dsh-thinking-status-customizer-status'
   status.setAttribute('aria-live', 'polite')
   status.dataset.dshThinkingStatusCustomizerStatus = ''
-  body.append(previewCard, enabledLabel, textLabel, colorGrid)
+  textLabel.dataset.modeField = 'text image-text'
+  colorGrid.dataset.modeField = 'text image-text'
+  body.append(previewCard, enabledLabel, modeLabel, textLabel, colorGrid, imageSourceLabel, imageFileLabel, imageSizeLabel)
   form.append(body, status, actions)
   dialog.append(header, form)
   return {
@@ -750,11 +1040,15 @@ function createControls(doc: Document): Controls {
     dialog,
     form,
     enabled,
+    mode,
     text,
     colorA,
     colorB,
     colorAValue,
     colorBValue,
+    imageSource,
+    imageFile,
+    imageSize,
     preview,
     restore,
     close,
@@ -764,7 +1058,7 @@ function createControls(doc: Document): Controls {
 }
 
 /** Associate a label with a new input while keeping unique namespaced ids. */
-function labelFor(doc: Document, input: HTMLInputElement, text: string): HTMLLabelElement {
+function labelFor(doc: Document, input: HTMLInputElement | HTMLSelectElement, text: string): HTMLLabelElement {
   const label = doc.createElement('label')
   const id = `dsh-thinking-status-customizer-${input.name}`
   input.id = id
@@ -776,9 +1070,12 @@ function labelFor(doc: Document, input: HTMLInputElement, text: string): HTMLLab
 /** Remove every plugin-owned root visual marker. */
 function clearVisualState(root: HTMLElement): void {
   root.removeAttribute(ROOT_ATTRIBUTE)
+  root.removeAttribute(MODE_ATTRIBUTE)
   root.style.removeProperty(TEXT_PROPERTY)
   root.style.removeProperty(COLOR_A_PROPERTY)
   root.style.removeProperty(COLOR_B_PROPERTY)
+  root.style.removeProperty(IMAGE_PROPERTY)
+  root.style.removeProperty(IMAGE_SIZE_PROPERTY)
 }
 
 /** Read localStorage without letting browser privacy policy abort plugin loading. */
@@ -800,16 +1097,68 @@ function isColor(value: unknown): value is string {
   return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value)
 }
 
+/** Accept only image sources that cannot load executable page schemes. */
+function isImageSource(value: unknown): value is string {
+  if (value === BUILTIN_IMAGE_SOURCE) return true
+  if (typeof value !== 'string') return false
+  if (/^https:\/\/\S+$/i.test(value)) return true
+  if (isTemporaryImageSource(value)) return true
+  return isDataImageSource(value) && value.length <= MAX_IMAGE_DATA_URL_CHARS
+}
+
+/** Recognize supported image Data URLs before applying the size guard. */
+function isDataImageSource(value: string): boolean {
+  return /^data:image\/(?:gif|png|webp);base64,[a-z0-9+/=\s]+$/i.test(value)
+}
+
+/** Identify a supported Data URL rejected only because it is too large. */
+function isOversizedImageDataUrl(value: unknown): boolean {
+  return typeof value === 'string' && isDataImageSource(value) && value.length > MAX_IMAGE_DATA_URL_CHARS
+}
+
+/** Identify a browser-owned object URL that cannot survive a reload. */
+function isTemporaryImageSource(value: string): boolean {
+  return /^blob:\S+$/i.test(value)
+}
+
+/** Toggle controls that belong to one display mode. */
+function syncModeFields(controls: Controls, mode: Settings['mode']): void {
+  for (const field of controls.dialog.querySelectorAll<HTMLElement>('[data-mode-field]')) {
+    field.hidden = !field.dataset.modeField?.split(' ').includes(mode)
+  }
+}
+
+/** Render one draft without changing the live status. */
+function renderPreview(controls: Controls, settings: Settings): void {
+  controls.preview.dataset.mode = settings.mode
+  controls.preview.textContent = settings.mode === 'text' ? settings.text : ''
+  controls.preview.style.setProperty(TEXT_PROPERTY, escapeCssString(settings.text))
+  controls.preview.style.setProperty(COLOR_A_PROPERTY, settings.colorA)
+  controls.preview.style.setProperty(COLOR_B_PROPERTY, settings.colorB)
+  controls.preview.style.setProperty(IMAGE_PROPERTY, imageSourceToCssUrl(settings.imageSource))
+  controls.preview.style.setProperty(IMAGE_SIZE_PROPERTY, `${Math.min(96, Math.max(24, settings.imageSize))}px`)
+}
+
+/** Normalize the browser select value to one supported display mode. */
+function parseMode(value: string): Settings['mode'] {
+  if (value === 'image' || value === 'image-text') return value
+  return 'text'
+}
+
 interface Controls {
   button: HTMLButtonElement
   dialog: HTMLElement
   form: HTMLFormElement
   enabled: HTMLInputElement
+  mode: HTMLSelectElement
   text: HTMLInputElement
   colorA: HTMLInputElement
   colorB: HTMLInputElement
   colorAValue: HTMLElement
   colorBValue: HTMLElement
+  imageSource: HTMLInputElement
+  imageFile: HTMLInputElement
+  imageSize: HTMLInputElement
   preview: HTMLElement
   restore: HTMLButtonElement
   close: HTMLButtonElement

@@ -18,6 +18,11 @@ const client = await build({
   bundle: true,
   entryPoints: ['src/client.ts'],
   format: 'cjs',
+  loader: {
+    '.gif': 'dataurl',
+    '.png': 'dataurl',
+    '.webp': 'dataurl',
+  },
   platform: 'browser',
   target: 'es2022',
   write: false,

@@ -1,6 +1,11 @@
 node_modules/
 coverage/
 *.tgz
+output/
+
+# Generated animation experiments; only the built-in source asset is versioned
+assets/animations/*
+!assets/animations/dance-reference-transparent.gif
 
 # Environment variables and local overrides
 .env
