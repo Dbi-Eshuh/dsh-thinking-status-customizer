@@ -208,6 +208,7 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   const openDialog = (): void => {
     controls.dialog.hidden = false
     controls.button.setAttribute('aria-expanded', 'true')
+    controls.button.setAttribute('aria-label', '关闭思考状态样式设置')
     updateCompatibilityStatus()
     controls.text.focus()
   }
@@ -215,7 +216,13 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   const closeDialog = (): void => {
     controls.dialog.hidden = true
     controls.button.setAttribute('aria-expanded', 'false')
+    controls.button.setAttribute('aria-label', '打开思考状态样式设置')
     controls.button.focus()
+  }
+
+  const toggleDialog = (): void => {
+    if (controls.dialog.hidden) openDialog()
+    else closeDialog()
   }
 
   const onSubmit = (event: Event): void => {
@@ -233,7 +240,7 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
     controls.status.textContent = '已同步另一个标签页的设置。'
   }
 
-  controls.button.addEventListener('click', openDialog)
+  controls.button.addEventListener('click', toggleDialog)
   controls.form.addEventListener('submit', onSubmit)
   controls.text.addEventListener('input', updateDraftPreview)
   controls.colorA.addEventListener('input', updateDraftPreview)
@@ -252,7 +259,7 @@ export function mountThinkingStatusCustomizer(doc: Document): () => void {
   return () => {
     if (disposed) return
     disposed = true
-    controls.button.removeEventListener('click', openDialog)
+    controls.button.removeEventListener('click', toggleDialog)
     controls.form.removeEventListener('submit', onSubmit)
     controls.text.removeEventListener('input', updateDraftPreview)
     controls.colorA.removeEventListener('input', updateDraftPreview)

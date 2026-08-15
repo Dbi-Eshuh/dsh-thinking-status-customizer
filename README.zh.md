@@ -23,11 +23,11 @@
 将指定版本安装到 Web Profile，检查解析后的配置，然后重启 DSH Web：
 
 ```sh
-dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.1.0
+dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.1.1
 dsh --profile web --dump-config
 ```
 
-重启后打开悬浮的 **思考状态** 按钮。设置面板可以启用或停用自定义显示、修改文字、选择两种流光颜色、保存设置或恢复默认值。
+重启后点击悬浮的 **思考状态** 按钮打开设置面板；再次点击同一按钮、点击关闭按钮或按 Escape 均可关闭。设置面板可以启用或停用自定义显示、修改文字、选择两种流光颜色、保存设置或恢复默认值。
 
 设置面板会继承 DSH Web 的浅色或深色主题变量，并在保存前实时预览文字与颜色调整。
 
