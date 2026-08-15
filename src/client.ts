@@ -1378,8 +1378,10 @@ function renderPreview(controls: Controls, settings: Settings): void {
 function applyFlowProperties(style: CSSStyleDeclaration, settings: Settings): void {
   const vertical = settings.direction === 'top-to-bottom' || settings.direction === 'bottom-to-top'
   const forward = settings.direction === 'left-to-right' || settings.direction === 'top-to-bottom'
-  const start = vertical ? `0 ${forward ? '-100%' : '100%'}` : `${forward ? '-100%' : '100%'} 0`
-  const end = vertical ? `0 ${forward ? '100%' : '-100%'}` : `${forward ? '100%' : '-100%'} 0`
+  // A 300% repeated background needs a 150% percentage change to move by one
+  // complete tile. Matching the endpoints keeps a normal loop at the same phase.
+  const start = vertical ? `0 ${forward ? '150%' : '0'}` : `${forward ? '150%' : '0'} 0`
+  const end = vertical ? `0 ${forward ? '0' : '150%'}` : `${forward ? '0' : '150%'} 0`
   style.setProperty(GRADIENT_PROPERTY, buildGradient(settings.colors, vertical ? '180deg' : '90deg'))
   style.setProperty(FLOW_START_PROPERTY, start)
   style.setProperty(FLOW_END_PROPERTY, end)

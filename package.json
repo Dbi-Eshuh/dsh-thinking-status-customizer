@@ -1,6 +1,6 @@
 {
   "name": "dsh-thinking-status-customizer",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Customize DSH Web thinking status with custom flowing text, animated GIF/APNG/WebP, or combined image-and-text modes.",
   "author": {
     "name": "Dbi-Eshuh",
