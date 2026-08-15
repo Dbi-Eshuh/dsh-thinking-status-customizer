@@ -2,7 +2,7 @@
 
 [中文](README.zh.md)
 
-A CSS-only DSH Web plugin that replaces the visible running status with custom text or a GIF, APNG, or WebP animation without modifying DSH source or rewriting the status DOM.
+A CSS-only DSH Web plugin that replaces the visible running status with custom flowing text, a GIF/APNG/WebP animation, or a combined image-and-text display without modifying DSH source or rewriting the status DOM.
 
 ## Preview
 
@@ -23,13 +23,13 @@ A CSS-only DSH Web plugin that replaces the visible running status with custom t
 Install the tagged release into a Web profile, inspect the resolved configuration, then restart DSH Web:
 
 ```sh
-dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.2.0
+dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.2.1
 dsh --profile web --dump-config
 ```
 
-Open the floating **思考状态** button after restart. Click the same button again, use the close button, or press Escape to close the panel. The dialog can enable or disable the visual replacement and switch among flowing text, an animated image, and a left-image/right-text combination. Image modes include a roughly 12-second dance GIF with a transparent background and also accept an HTTPS/Data URL or a local GIF, APNG, or WebP up to 20 MB. Local files above 2 MB remain uncompressed and use a temporary object URL, so they work only in the current tab and must be selected again after a reload.
+Open the floating **Thinking status** button after restart. Click the same button again, use the close button, or press Escape to close the panel. The plugin follows the active DSH language setting and updates its English or Chinese interface immediately without discarding unsaved form values; user-authored custom text is preserved verbatim. The dialog can enable or disable the visual replacement and switch among custom text with a flow effect, an animated image, and a left-image/right-text combination. Text modes support two to five custom colors, four flow directions, and continuous or back-and-forth movement. Image modes include a roughly 12-second dance GIF with a transparent background and also accept an HTTPS/Data URL or a local GIF, APNG, or WebP up to 20 MB. Local files above 2 MB remain uncompressed and use a temporary object URL, so they work only in the current tab and must be selected again after a reload.
 
-The settings panel inherits DSH Web's light or dark theme tokens and previews text, color, animation, and size edits before they are saved.
+The settings panel inherits DSH Web's light or dark theme tokens and previews text, color count, colors, flow direction, movement pattern, animation, and size edits before they are saved.
 
 Remove the plugin and restart DSH Web to restore the built-in presentation:
 
@@ -39,7 +39,7 @@ dsh plugin --profile web remove dsh-thinking-status-customizer
 
 ## Behavior and privacy
 
-The default mode is the flowing text `正在吃饭中...`. Settings and Data URL images up to about 3 MB are stored only in browser `localStorage` under `dsh-thinking-status-customizer:v1`; larger local images use a temporary object URL and are not persisted. The plugin does not upload settings, status text, images, or model interaction. When an HTTPS image URL is configured, the browser requests that URL directly. Missing, corrupt, or unavailable storage resolves to defaults without stopping the page.
+The default mode is the custom text `正在吃饭中...` with a flow effect. Settings and Data URL images up to about 3 MB are stored only in browser `localStorage` under `dsh-thinking-status-customizer:v1`; larger local images use a temporary object URL and are not persisted. The plugin does not upload settings, status text, images, or model interaction. When an HTTPS image URL is configured, the browser requests that URL directly. Missing, corrupt, or unavailable storage resolves to defaults without stopping the page.
 
 The stylesheet targets only `[data-conversation-scroll] [role="status"][aria-live="polite"]`. It adds a layout-participating pseudo-element and plugin-owned CSS properties; it does not observe the page, replace `textContent`, or target other live-status elements. Disabling or unloading the plugin removes its style, controls, attributes, CSS properties, and event listeners.
 
@@ -49,7 +49,7 @@ The original DSH status remains in the accessibility tree. This plugin therefore
 
 The current release is tested with DSH Web `0.1.0-rc.6`. It relies on the semantic selector above because `ui-conversation` does not expose a running-status text provider in that release. A DSH update that changes the selector can make the visual replacement inactive; the plugin remains loaded and its dialog reports that it is waiting for a matching status.
 
-This package uses only the public DSH bundle and client-module loading declarations. It does not patch `ui-conversation` or depend on private DSH build helpers.
+This package uses only the public DSH bundle, client-module loading declarations, and client locale service. It does not patch `ui-conversation` or depend on private DSH build helpers.
 
 ## Develop and verify
 
