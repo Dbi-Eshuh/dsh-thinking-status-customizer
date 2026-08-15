@@ -2,7 +2,7 @@
 
 [English](README.md)
 
-这是一个纯 CSS 的 DSH Web 插件。它可以自定义运行中状态的可见文字和双色流光效果，不修改 DSH 源码，也不重写状态元素的 DOM。
+这是一个纯 CSS 的 DSH Web 插件。它可以用自定义文字或 GIF、APNG、WebP 动画覆盖运行中状态的视觉显示，不修改 DSH 源码，也不重写状态元素的 DOM。
 
 ## 效果预览
 
@@ -23,13 +23,13 @@
 将指定版本安装到 Web Profile，检查解析后的配置，然后重启 DSH Web：
 
 ```sh
-dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.1.1
+dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.2.0
 dsh --profile web --dump-config
 ```
 
-重启后点击悬浮的 **思考状态** 按钮打开设置面板；再次点击同一按钮、点击关闭按钮或按 Escape 均可关闭。设置面板可以启用或停用自定义显示、修改文字、选择两种流光颜色、保存设置或恢复默认值。
+重启后点击悬浮的 **思考状态** 按钮打开设置面板；再次点击同一按钮、点击关闭按钮或按 Escape 均可关闭。设置面板可以启用或停用自定义显示，并在流光文字、动态图片和左图右文三种模式之间切换。图片模式内置一张约 12 秒、透明背景的舞蹈 GIF，也支持 HTTPS / Data URL，以及不超过 20 MB 的本地 GIF、APNG 或 WebP 文件。超过 2 MB 的本地图片不压缩，使用临时对象 URL，仅在当前标签页有效，刷新后需要重新选择。
 
-设置面板会继承 DSH Web 的浅色或深色主题变量，并在保存前实时预览文字与颜色调整。
+设置面板会继承 DSH Web 的浅色或深色主题变量，并在保存前实时预览文字、颜色、动画和尺寸调整。
 
 卸载后重启 DSH Web，即可恢复内置显示：
 
@@ -39,7 +39,7 @@ dsh plugin --profile web remove dsh-thinking-status-customizer
 
 ## 行为与隐私
 
-默认显示文字是 `正在吃饭中...`。设置只保存在浏览器 `localStorage` 的 `dsh-thinking-status-customizer:v1` 项中；插件不会通过网络发送设置、状态文字或模型交互。存储缺失、损坏或不可用时，插件使用默认值，不会阻止页面加载。
+默认使用流光文字 `正在吃饭中...`。设置和不超过约 3 MB 的 Data URL 图片只保存在浏览器 `localStorage` 的 `dsh-thinking-status-customizer:v1` 项中；更大的本地图片使用临时对象 URL，不会写入存储。插件不会主动上传设置、状态文字、图片或模型交互。用户填写 HTTPS 图片地址时，浏览器会直接向该地址请求图片。存储缺失、损坏或不可用时，插件使用默认值，不会阻止页面加载。
 
 样式仅匹配 `[data-conversation-scroll] [role="status"][aria-live="polite"]`。插件使用参与布局的伪元素和自有 CSS 属性，不监听页面、不替换 `textContent`，也不匹配其他实时状态元素。停用或卸载插件会移除其样式、控件、属性、CSS 属性和事件监听器。
 

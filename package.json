@@ -1,6 +1,6 @@
 {
   "name": "dsh-thinking-status-customizer",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A lifecycle-safe CSS-only customizer for the DSH Web thinking status.",
   "author": {
     "name": "Dbi-Eshuh",
@@ -39,7 +39,9 @@
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
-    "assets",
+    "assets/harness-dark-preview.png",
+    "assets/harness-light-preview.png",
+    "assets/settings-preview.png",
     "LICENSE"
   ],
   "dsh": {
