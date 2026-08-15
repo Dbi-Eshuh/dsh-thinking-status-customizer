@@ -23,7 +23,7 @@ A CSS-only DSH Web plugin that replaces the visible running status with custom f
 Install the tagged release into a Web profile, inspect the resolved configuration, then restart DSH Web:
 
 ```sh
-dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.2.1
+dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.2.2
 dsh --profile web --dump-config
 ```
 

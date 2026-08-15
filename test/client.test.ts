@@ -128,6 +128,8 @@ describe('thinking status CSS isolation', () => {
     expect(root.getAttribute('data-dsh-thinking-status-customizer-mode')).toBe('image-text')
     expect(root.style.getPropertyValue('--dsh-thinking-status-customizer-text')).toBe('"正在思考中..."')
     expect(style).toContain('dsh-thinking-status-customizer-image-text-flow')
+    expect(style).toContain('from { background-position: left center, var(--dsh-thinking-status-customizer-flow-start); }')
+    expect(style).toContain('to { background-position: left center, var(--dsh-thinking-status-customizer-flow-end); }')
     expect(style).toContain('background-repeat: no-repeat, repeat')
     expect(style).toContain('padding-left: calc(var(--dsh-thinking-status-customizer-image-size) + 6px)')
     expect(document.querySelector('#turn span')?.textContent).toBe('15s')
@@ -230,10 +232,34 @@ describe('settings persistence and validation', () => {
       .toBe(escapeCssString(saved.text))
     expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-gradient'))
       .toContain('linear-gradient(180deg, #123456 0%, #abcdef 25%, #fedcba 50%')
-    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-start')).toBe('0 100%')
-    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-end')).toBe('0 -100%')
+    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-start')).toBe('0 0')
+    expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-end')).toBe('0 150%')
     expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-direction')).toBe('alternate')
     expect(escapeCssString('x"; color: red; /*')).toBe('"x\\"; color: red; /*"')
+  })
+
+  it('uses one complete repeated-gradient tile for every flow direction', () => {
+    const dom = page()
+    const cleanup = mountThinkingStatusCustomizer(dom.window.document)
+    cleanups.push(cleanup)
+    const form = dom.window.document.querySelector('form')!
+    const direction = form.querySelector<HTMLSelectElement>('select[name="direction"]')!
+    const rootStyle = dom.window.document.documentElement.style
+    const expected = {
+      'left-to-right': ['150% 0', '0 0'],
+      'right-to-left': ['0 0', '150% 0'],
+      'top-to-bottom': ['0 150%', '0 0'],
+      'bottom-to-top': ['0 0', '0 150%'],
+    } as const
+
+    for (const [value, [start, end]] of Object.entries(expected)) {
+      direction.value = value
+      form.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true }))
+      expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-start')).toBe(start)
+      expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-end')).toBe(end)
+      expect(rootStyle.getPropertyValue('--dsh-thinking-status-customizer-flow-size'))
+        .toBe(value.includes('top') || value.includes('bottom') ? '100% 300%' : '300% 100%')
+    }
   })
 
   it('rejects invalid input and resolves corrupt storage to defaults', () => {

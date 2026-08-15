@@ -23,7 +23,7 @@
 将指定版本安装到 Web Profile，检查解析后的配置，然后重启 DSH Web：
 
 ```sh
-dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.2.1
+dsh plugin --profile web add github:Dbi-Eshuh/dsh-thinking-status-customizer#v0.2.2
 dsh --profile web --dump-config
 ```
 
